@@ -9,6 +9,5 @@ export default function registerSockets(io, app) {
   ttto.on("connection", (socket) => tttHandler(socket, ttto));
   chesso.on("connection", (socket) => chessHandler(socket, chesso));
 
-  // REST endpoints to list rooms
   app.use("/api/rooms", roomsRouter({ tttRooms, chessRooms }));
 }

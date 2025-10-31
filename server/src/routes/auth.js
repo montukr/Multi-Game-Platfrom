@@ -3,13 +3,14 @@ import Joi from "joi";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import User from "../models/User.js";
+import requireAuth from "../middleware/auth.js";
 
 const router = express.Router();
 
 const regSchema = Joi.object({
   email: Joi.string().email().required(),
   username: Joi.string().min(3).max(20).required(),
-  password: Joi.string().min(4).required(), // min 4
+  password: Joi.string().min(4).required(),
 });
 
 router.post("/register", async (req, res) => {
@@ -29,12 +30,49 @@ router.post("/login", async (req, res) => {
   const ok = await bcrypt.compare(password, user.password);
   if (!ok) return res.status(401).json({ message: "Invalid credentials" });
   const token = jwt.sign({ sub: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-  res.cookie("token", token, { httpOnly: true, sameSite: "lax", secure: false, maxAge: 7 * 24 * 60 * 60 * 1000 });
+  res.cookie("token", token, { httpOnly: true, sameSite: "lax", secure: false, maxAge: 7*24*60*60*1000 });
   res.json({ id: user._id, email: user.email, username: user.username });
 });
 
-router.post("/logout", (req, res) => {
+router.post("/logout", (_req, res) => {
   res.clearCookie("token");
+  res.json({ ok: true });
+});
+
+// Forgot Password (simple: set new password by email)
+router.post("/forgot-password", async (req, res) => {
+  const schema = Joi.object({ email: Joi.string().email().required(), newPassword: Joi.string().min(4).required() });
+  const { error, value } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.message });
+  const user = await User.findOne({ email: value.email });
+  if (!user) return res.status(404).json({ message: "User not found" });
+  const hash = await bcrypt.hash(value.newPassword, 10);
+  user.password = hash;
+  await user.save();
+  res.json({ ok: true });
+});
+
+// Change username (user ID/handle)
+router.post("/change-username", requireAuth, async (req, res) => {
+  const schema = Joi.object({ username: Joi.string().min(3).max(20).required() });
+  const { error, value } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.message });
+  const exists = await User.findOne({ username: value.username });
+  if (exists) return res.status(400).json({ message: "Username already taken" });
+  const user = await User.findByIdAndUpdate(req.userId, { username: value.username }, { new: true }).select("_id email username");
+  res.json(user);
+});
+
+// Change password (authenticated)
+router.post("/change-password", requireAuth, async (req, res) => {
+  const schema = Joi.object({ oldPassword: Joi.string().required(), newPassword: Joi.string().min(4).required() });
+  const { error, value } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.message });
+  const user = await User.findById(req.userId);
+  const ok = await bcrypt.compare(value.oldPassword, user.password);
+  if (!ok) return res.status(401).json({ message: "Old password incorrect" });
+  user.password = await bcrypt.hash(value.newPassword, 10);
+  await user.save();
   res.json({ ok: true });
 });
 

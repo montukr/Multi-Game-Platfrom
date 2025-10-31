@@ -8,6 +8,7 @@ import connectDB from "./config/db.js";
 import authRoutes from "./routes/auth.js";
 import profileRoutes from "./routes/profile.js";
 import registerSockets from "./sockets/index.js";
+import snakeRoutes from "./routes/snake.js";
 
 dotenv.config();
 const app = express();
@@ -20,13 +21,13 @@ connectDB();
 
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/snake", snakeRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: process.env.CORS_ORIGIN, credentials: true },
 });
 
-// pass app so socket index can mount /api/rooms
 registerSockets(io, app);
 
 const PORT = process.env.PORT || 5000;

@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/axios";
+import tttImg from "../assets/ttt.jpg";
+import chessImg from "../assets/chess.jpg";
+import snakeImg from "../assets/snake.jpg";
 
 export default function Lobby() {
   const nav = useNavigate();
@@ -25,77 +28,105 @@ export default function Lobby() {
     return () => { on = false; clearInterval(id); };
   }, []);
 
-  function safeJoin(path, id) {
-    const room = (id || "").trim();
-    if (!room) { alert("Enter a room ID"); return; }
-    nav(`/${path}/${room}`);
+  function smartJoin(path, id, list) {
+    const rid = (id || "").trim();
+    if (!rid) { alert("Enter a room ID"); return; }
+    const matches = (list || []).filter(r => r.id === rid);
+    if (matches.length === 1) nav(`/${path}/${rid}`);
+    else if (matches.length > 1) alert(`Multiple rooms found for ${rid}. Choose one below.`);
+    else nav(`/${path}/${rid}`);
   }
 
   return (
-    <div style={{ display: "grid", gap: 18, gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))" }}>
-      <GameCard
-        title="Tic‑Tac‑Toe"
-        description="Play real‑time"
-        inputValue={tttRoom}
-        onInput={setTttRoom}
-        onJoin={() => safeJoin("tictactoe", tttRoom)}
-        list={tttList}
-        onQuickJoin={(id) => nav(`/tictactoe/${id}`)}
-      />
-      <GameCard
-        title="Chess"
-        description="Real‑time chess"
-        inputValue={chessRoom}
-        onInput={setChessRoom}
-        onJoin={() => safeJoin("chess", chessRoom)}
-        list={chessList}
-        onQuickJoin={(id) => nav(`/chess/${id}`)}
-      />
-      <GameCard
-        title="Snake"
-        description="Offline classic snake"
-        hideInput
-        onJoin={() => nav("/snake")}
-      />
+    <div>
+      <div style={{ display:"flex", justifyContent:"flex-end", marginBottom: 16 }}>
+        <button onClick={() => nav("/profile")} style={btnPrimary}>Profile</button>
+      </div>
+
+      <div style={{ display: "grid", gap: 24, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+        <GameStack
+          title="Tic‑Tac‑Toe"
+          description="Enter a Room ID to join."
+          image={tttImg}
+          input={{ placeholder: "Enter room ID", value: tttRoom, onChange: setTttRoom }}
+          onJoin={() => smartJoin("tictactoe", tttRoom, tttList)}
+          rooms={(tttRoom ? tttList.filter(r => r.id === tttRoom) : tttList)}
+          onQuickJoin={(id) => nav(`/tictactoe/${id}`)}
+        />
+        <GameStack
+          title="Chess"
+          description="Enter a Room ID to join."
+          image={chessImg}
+          input={{ placeholder: "Enter room ID", value: chessRoom, onChange: setChessRoom }}
+          onJoin={() => smartJoin("chess", chessRoom, chessList)}
+          rooms={(chessRoom ? chessList.filter(r => r.id === chessRoom) : chessList)}
+          onQuickJoin={(id) => nav(`/chess/${id}`)}
+        />
+        <GameStack
+          title="Snake"
+          description="Offline classic; keyboard and mouse/touch."
+          image={snakeImg}
+          onJoin={() => nav("/snake")}
+        />
+      </div>
     </div>
   );
 }
 
-function GameCard({ title, description, inputValue, onInput, onJoin, hideInput, list = [], onQuickJoin }) {
+function GameStack({ title, description, image, input, onJoin, rooms = [], onQuickJoin }) {
   return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: 14, padding: 16, boxShadow: "0 2px 10px rgba(0,0,0,0.06)", background: "#fff" }}>
-      <h3 style={{ margin: "0 0 6px 0" }}>{title}</h3>
-      <p style={{ margin: "0 0 12px 0", color: "#6b7280" }}>{description}</p>
-      {!hideInput && (
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            placeholder="Room ID"
-            value={inputValue}
-            onChange={(e) => onInput(e.target.value)}
-            style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #e5e7eb" }}
-          />
-          <button onClick={onJoin} style={{ padding: "10px 12px", borderRadius: 10, background: "#0ea5e9", color: "#fff", border: "none" }}>
-            Join
-          </button>
+    <div style={card}>
+      <div style={{ position: "relative", height: 180 }}>
+        <img src={image} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.9 }} />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.8) 100%)" }} />
+        <div style={{ position: "absolute", bottom: 12, left: 16, color: "white" }}>
+          <h3 style={{ margin: 0, fontSize: 20 }}>{title}</h3>
+          <p style={{ margin: "4px 0 0 0", opacity: 0.9 }}>{description}</p>
         </div>
-      )}
-      {list.length > 0 && (
-        <div style={{ marginTop: 10 }}>
-          <p style={{ margin: "6px 0", color: "#6b7280" }}>Available rooms</p>
-          {list.map(r => (
-            <button key={r.id} onClick={() => onQuickJoin(r.id)} style={{
-              width: "100%", textAlign: "left", padding: 10, borderRadius: 10, border: "1px solid #e5e7eb", marginTop: 6, background: "#f8fafc"
-            }}>
-              {r.id} • {r.players.map(p => p.username).join(", ") || "Empty"}
-            </button>
-          ))}
-        </div>
-      )}
-      {hideInput && (
-        <button onClick={onJoin} style={{ width: "100%", padding: 10, borderRadius: 10, background: "#0ea5e9", color: "#fff", border: "none", marginTop: 8 }}>
-          Play
-        </button>
-      )}
+      </div>
+
+      <div style={{ padding: 16, display: "grid", gap: 12 }}>
+        {input ? (
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              placeholder={input.placeholder}
+              value={input.value}
+              onChange={(e) => input.onChange(e.target.value)}
+              style={inputStyle}
+            />
+            <button onClick={onJoin} style={btnPrimary}>Join</button>
+          </div>
+        ) : (
+          <button onClick={onJoin} style={{ ...btnPrimary, width: "100%" }}>Play</button>
+        )}
+
+        {rooms.length > 0 && (
+          <div style={{ display: "grid", gap: 8 }}>
+            <p style={{ margin: "2px 0", color: "#6b7280", fontWeight: 600 }}>Available rooms</p>
+            {rooms.map(r => (
+              <button key={`${r.id}-${r.winner||"live"}`} onClick={() => onQuickJoin(r.id)} style={roomItem}>
+                <span style={{ color: "#0f172a", fontWeight: 700 }}>{r.id}</span>
+                <span style={{ color: r.winner ? "#ef4444" : "#6b7280", fontSize: 12 }}>
+                  {r.winner ? `Winner: ${r.winner}` : (r.players?.map(p => p.username).join(", ") || "Empty")}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+const btnPrimary = {
+  padding: "8px 12px",
+  borderRadius: 10,
+  background: "linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)",
+  color: "#fff",
+  border: "none",
+  cursor: "pointer",
+  fontWeight: 700
+};
+const card = { borderRadius: 18, overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.08)", background: "#fff", display: "flex", flexDirection: "column" };
+const inputStyle = { flex: 1, padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", background: "#f8fafc" };
+const roomItem = { width: "100%", textAlign: "left", padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", background: "#ffffff", display: "flex", justifyContent: "space-between", alignItems: "center" };
