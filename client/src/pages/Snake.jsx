@@ -12,7 +12,6 @@ export default function Snake() {
     const size = 20, cols = Math.floor(canvas.width / size), rows = Math.floor(canvas.height / size);
 
     let snake = [{ x: 5, y: 5 }];
-    // Starter gets initial direction advantage
     let dir = starter === "p1" ? { x: 1, y: 0 } : { x: 0, y: 1 };
     let nextDir = { ...dir };
     let food = randFood();
@@ -55,14 +54,11 @@ export default function Snake() {
         body: JSON.stringify({ score: best }),
       }).catch(()=>{});
 
-      // Toggle starter for next match
       const nextStarter = starter === "p1" ? "p2" : "p1";
       localStorage.setItem("snake_starter", nextStarter);
       setStarter(nextStarter);
 
-      // Auto-restart after brief delay to simulate “result screen”, or let user refresh/play again
       setTimeout(() => {
-        // simple reset using same component life
         reset(nextStarter);
       }, 600);
     }
@@ -111,17 +107,24 @@ export default function Snake() {
     };
 
     function keyDown(e) {
-      if (e.key === "ArrowUp" && dir.y !== 1) nextDir = { x: 0, y: -1 };
-      else if (e.key === "ArrowDown" && dir.y !== -1) nextDir = { x: 0, y: 1 };
-      else if (e.key === "ArrowLeft" && dir.x !== 1) nextDir = { x: -1, y: 0 };
-      else if (e.key === "ArrowRight" && dir.x !== -1) nextDir = { x: 1, y: 0 };
+      const key = e.key.toLowerCase();
+      if ((key === "arrowup" || key === "w") && dir.y !== 1)
+        nextDir = { x: 0, y: -1 };
+      else if ((key === "arrowdown" || key === "s") && dir.y !== -1)
+        nextDir = { x: 0, y: 1 };
+      else if ((key === "arrowleft" || key === "a") && dir.x !== 1)
+        nextDir = { x: -1, y: 0 };
+      else if ((key === "arrowright" || key === "d") && dir.x !== -1)
+        nextDir = { x: 1, y: 0 };
     }
+
     function toCanvasCoords(canvas, e) {
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX !== undefined ? e.clientX : e.touches[0].clientX;
       const y = e.clientY !== undefined ? e.clientY : e.touches[0].clientY;
       return { x: x - rect.left, y: y - rect.top };
     }
+
     function setToward(x, y) {
       const head = { x: snake[0].x * size + size / 2, y: snake[0].y * size + size / 2 };
       const dx = x - head.x, dy = y - head.y;
@@ -136,10 +139,64 @@ export default function Snake() {
   }, [starter]);
 
   return (
-    <div style={{ padding: 16 }}>
+    <div style={{ padding: 16, textAlign: "center" }}>
       <h2>Snake</h2>
       <p>Score: {score} • Starter: {starter === "p1" ? "Player A" : "Player B"}</p>
-      <canvas ref={canvasRef} width={480} height={360} style={{ border: "1px solid #e5e7eb", borderRadius: 10, touchAction: "none", background: "#0b1220" }} />
+      <canvas
+        ref={canvasRef}
+        width={480}
+        height={360}
+        style={{
+          border: "1px solid #e5e7eb",
+          borderRadius: 10,
+          touchAction: "none",
+          background: "#0b1220"
+        }}
+      />
+
+      {/* On-screen mobile controls */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateAreas: `"up up up" "left center right" "down down down"`,
+          gap: 8,
+          width: 160,
+          margin: "16px auto"
+        }}
+      >
+        {[
+          { name: "↑", area: "up", dir: { x: 0, y: -1 } },
+          { name: "↓", area: "down", dir: { x: 0, y: 1 } },
+          { name: "←", area: "left", dir: { x: -1, y: 0 } },
+          { name: "→", area: "right", dir: { x: 1, y: 0 } },
+        ].map((btn) => (
+          <button
+            key={btn.name}
+            style={{
+              gridArea: btn.area,
+              padding: 16,
+              fontSize: 20,
+              borderRadius: 10,
+              background: "#1e293b",
+              color: "#f1f5f9",
+              border: "none",
+              touchAction: "none"
+            }}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              if (Math.abs(btn.dir.x) !== Math.abs(0) ||
+                  Math.abs(btn.dir.y) !== Math.abs(0))
+                window.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: btn.name === "↑" ? "ArrowUp" :
+                                                          btn.name === "↓" ? "ArrowDown" :
+                                                          btn.name === "←" ? "ArrowLeft" : "ArrowRight" })
+                );
+            }}
+          >
+            {btn.name}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
