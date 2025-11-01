@@ -39,9 +39,9 @@ import Login from "./auth/Login";
 import Register from "./auth/Register";
 import TicTacToeSingle from "./pages/TicTacToeSingle";
 import ChessSingle from "./pages/ChessSingle";
-import Tetris from "./pages/Tetris";
+import Tetris from "./pages/tetris";
 import FlappyBird from "./pages/FlappyBird";
-import CrossyRoad from "./pages/CrossyRoad";
+import PacMan from "./pages/PacMan";
 
 export const router = createBrowserRouter([
   {
@@ -60,7 +60,7 @@ export const router = createBrowserRouter([
       { path: "snake", element: <Snake /> },
       { path: "tetris", element: <Tetris /> },
       { path: "flappybird", element: <FlappyBird /> },
-      { path: "crossyroad", element: <CrossyRoad />},
+      { path: "pacman", element: <PacMan /> },
       { path: "profile", element: <Profile /> },
     ],
   },

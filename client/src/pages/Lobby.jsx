@@ -6,8 +6,7 @@ import chessImg from "../assets/chess.jpg";
 import snakeImg from "../assets/snake.jpg";
 import tetrisImg from "../assets/tetris.jpg";
 import flappyImg from "../assets/flappy.jpg";
-import crossyImg from "../assets/crossy.jpg"; // ← add your Crossy Road image
-
+import pacmanImg from "../assets/pacman.jpg";
 export default function Lobby() {
   const nav = useNavigate();
   const [tttRoom, setTttRoom] = useState("");
@@ -118,12 +117,12 @@ export default function Lobby() {
           onJoin={() => nav("/flappybird")}
         />
 
-        {/* Crossy Road */}
+        {/* Pac Man */}
         <GameStack
-          title="Crossy Road"
-          description="Dodge traffic, hop across roads — how far can you go?"
-          image={crossyImg}
-          onJoin={() => nav("/crossyroad")}
+          title="Pac-Man"
+          description="Eat dots, dodge ghosts, survive as long as you can."
+          image={pacmanImg}
+          onJoin={() => nav("/pacman")}
         />
       </div>
     </div>

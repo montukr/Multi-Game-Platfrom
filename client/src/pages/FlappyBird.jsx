@@ -1,16 +1,24 @@
 // App.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 export default function App() {
-  const [birdY, setBirdY] = useState(200);
+  const [birdY, setBirdY] = useState(250);
   const [birdVel, setBirdVel] = useState(0);
   const [pipes, setPipes] = useState([]);
-  const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
 
   const gravity = 0.5;
   const jumpStrength = -8;
+  const gameWidth = 600;
+  const gameHeight = 600;
+
+  const birdSize = 40;
+  const pipeWidth = 80;
+  const baseGap = 180;
+
+  const loopRef = useRef(null);
 
   const jump = () => {
     if (gameOver) {
@@ -22,7 +30,7 @@ export default function App() {
   };
 
   const resetGame = () => {
-    setBirdY(200);
+    setBirdY(250);
     setBirdVel(0);
     setPipes([]);
     setScore(0);
@@ -30,6 +38,7 @@ export default function App() {
     setGameStarted(false);
   };
 
+  // key controls
   useEffect(() => {
     const handleKey = (e) => {
       if (e.code === "Space" || e.code === "ArrowUp") {
@@ -41,66 +50,87 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKey);
   });
 
+  // main game loop
   useEffect(() => {
     if (!gameStarted || gameOver) return;
 
-    const gameLoop = setInterval(() => {
-      // bird physics
+    loopRef.current = setInterval(() => {
+      // update bird physics
       setBirdVel((v) => v + gravity);
       setBirdY((y) => y + birdVel);
 
-      // move pipes
-      setPipes((prev) =>
-        prev
-          .map((pipe) => ({ ...pipe, x: pipe.x - 3 }))
-          .filter((pipe) => pipe.x + 100 > 0)
-      );
+      // pipe movement and cleanup
+      setPipes((prev) => {
+        const updated = prev
+          .map((p) => ({ ...p, x: p.x - (3 + Math.min(score / 10, 3)) })) // speed up slowly
+          .filter((p) => p.x + pipeWidth > 0);
 
-      // generate pipes
-      if (pipes.length === 0 || pipes[pipes.length - 1].x < 250) {
-        const topY = Math.floor(Math.random() * 200) - 150;
-        setPipes((prev) => [...prev, { x: 600, y: topY }]);
-      }
-
-      // check collisions
-      const birdRect = { top: birdY, bottom: birdY + 50, left: 50, right: 100 };
-      for (let pipe of pipes) {
-        const pipeRect = { top: pipe.y, bottom: pipe.y + 600, left: pipe.x, right: pipe.x + 100 };
-        const overlap =
-          birdRect.right > pipeRect.left &&
-          birdRect.left < pipeRect.right &&
-          birdRect.bottom > pipeRect.top &&
-          birdRect.top < pipeRect.bottom;
-        if (overlap || birdY > 550 || birdY < 0) {
-          setGameOver(true);
-          setGameStarted(false);
-          clearInterval(gameLoop);
-          return;
+        // add new pipe
+        if (updated.length === 0 || updated[updated.length - 1].x < gameWidth - 250) {
+          const topHeight = Math.random() * 200 + 50;
+          const gap = Math.max(baseGap - score * 3, 120); // gap shrinks slightly
+          updated.push({
+            x: gameWidth,
+            topHeight,
+            gap,
+            scored: false,
+          });
         }
-      }
 
-      // scoring
-      pipes.forEach((pipe) => {
-        if (pipe.x + 100 === 50) setScore((s) => s + 1);
+        return updated;
       });
+
+      // collision + scoring check
+      setPipes((prev) =>
+        prev.map((pipe) => {
+          const birdTop = birdY;
+          const birdBottom = birdY + birdSize;
+          const birdLeft = 100;
+          const birdRight = 100 + birdSize;
+
+          const topPipeBottom = pipe.topHeight;
+          const bottomPipeTop = pipe.topHeight + pipe.gap;
+
+          const pipeLeft = pipe.x;
+          const pipeRight = pipe.x + pipeWidth;
+
+          // collision check
+          const hit =
+            birdRight > pipeLeft &&
+            birdLeft < pipeRight &&
+            (birdTop < topPipeBottom || birdBottom > bottomPipeTop);
+
+          if (hit || birdY < 0 || birdY + birdSize > gameHeight) {
+            setGameOver(true);
+            clearInterval(loopRef.current);
+          }
+
+          // score check
+          if (!pipe.scored && pipe.x + pipeWidth < 100) {
+            setScore((s) => s + 1);
+            return { ...pipe, scored: true };
+          }
+          return pipe;
+        })
+      );
     }, 30);
 
-    return () => clearInterval(gameLoop);
-  }, [gameStarted, gameOver, birdVel, pipes]);
+    return () => clearInterval(loopRef.current);
+  }, [gameStarted, gameOver, birdVel, pipes, score]);
 
   return (
     <div
       onClick={jump}
       style={{
         position: "relative",
-        width: "600px",
-        height: "600px",
-        border: "1px solid #000",
+        width: `${gameWidth}px`,
+        height: `${gameHeight}px`,
+        border: "2px solid #000",
         overflow: "hidden",
-        backgroundColor: gameOver ? "#ff6347" : "#87ceeb",
-        margin: "0 auto",
-        transition: "background-color 0.5s ease",
+        backgroundColor: gameOver ? "#e57373" : "#87ceeb",
+        margin: "40px auto",
         cursor: "pointer",
+        transition: "background-color 0.4s ease",
       }}
     >
       {/* Bird */}
@@ -109,34 +139,46 @@ export default function App() {
         alt="bird"
         style={{
           position: "absolute",
-          width: "50px",
-          height: "50px",
-          left: 50,
+          width: birdSize,
+          height: birdSize,
+          left: 100,
           top: birdY,
           userSelect: "none",
         }}
         draggable={false}
       />
 
-      {/* Pipes */}
+      {/* Pipes (simple rectangles) */}
       {pipes.map((pipe, i) => (
-        <img
-          key={i}
-          src="https://media.geeksforgeeks.org/wp-content/uploads/20231211115753/6d2a698f31595a1.png"
-          alt="pipe"
-          style={{
-            position: "absolute",
-            width: "100px",
-            height: "600px",
-            left: pipe.x,
-            top: pipe.y,
-            userSelect: "none",
-          }}
-          draggable={false}
-        />
+        <React.Fragment key={i}>
+          {/* top pipe */}
+          <div
+            style={{
+              position: "absolute",
+              backgroundColor: "#2ecc71",
+              width: pipeWidth,
+              height: pipe.topHeight,
+              left: pipe.x,
+              top: 0,
+              border: "2px solid #145a32", // added outline
+            }}
+          />
+          {/* bottom pipe */}
+          <div
+            style={{
+              position: "absolute",
+              backgroundColor: "#2ecc71",
+              width: pipeWidth,
+              height: gameHeight - (pipe.topHeight + pipe.gap),
+              left: pipe.x,
+              top: pipe.topHeight + pipe.gap,
+              border: "2px solid #145a32", // added outline
+            }}
+          />
+        </React.Fragment>
       ))}
 
-      {/* UI */}
+      {/* Score */}
       {gameStarted && !gameOver && (
         <div
           style={{
@@ -153,6 +195,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Start prompt */}
       {!gameStarted && !gameOver && (
         <div
           style={{
@@ -169,6 +212,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Game Over */}
       {gameOver && (
         <div
           style={{
@@ -186,7 +230,7 @@ export default function App() {
           <br />
           <p
             style={{
-              backgroundColor: "blue",
+              backgroundColor: "#1976d2",
               padding: "4px 8px",
               borderRadius: "5px",
               display: "inline-block",

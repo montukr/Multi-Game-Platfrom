@@ -10,23 +10,21 @@ const tetrisSchema = new mongoose.Schema({
   highestScore: { type: Number, default: 0 },
 }, { _id: false });
 
+// --- Flappy Bird schema ---
+const flappySchema = new mongoose.Schema({
+  highestScore: { type: Number, default: 0 },
+}, { _id: false });
+
+// --- Pac-Man schema ---
+const pacmanSchema = new mongoose.Schema({
+  highestScore: { type: Number, default: 0 },
+}, { _id: false });
+
 // --- Generic game totals (used by TicTacToe, Chess, etc.) ---
 const gameTotalsSchema = new mongoose.Schema({
   wins: { type: Number, default: 0 },
   gamesJoined: { type: Number, default: 0 },
 }, { _id: false });
-
-// ---Flappyt Bird (score) ---
-const flappySchema = new mongoose.Schema({
-  highestScore: { type: Number, default: 0 },
-}, { _id: false });
-
-// --- Crossy Road (score) ---
-const crossySchema = new mongoose.Schema({
-  highestScore: { type: Number, default: 0 },
-}, { _id: false });
-
-
 
 // --- Main user progress schema ---
 const userProgressSchema = new mongoose.Schema({
@@ -42,9 +40,9 @@ const userProgressSchema = new mongoose.Schema({
     ttt:    { type: gameTotalsSchema, default: () => ({}) },
     chess:  { type: gameTotalsSchema, default: () => ({}) },
     snake:  { type: snakeSchema,      default: () => ({}) },
-    tetris: { type: tetrisSchema,     default: () => ({}) }, // ✅ Added Tetris
+    tetris: { type: tetrisSchema,     default: () => ({}) },
     flappy: { type: flappySchema,     default: () => ({}) },
-    crossy: { type: crossySchema,     default: () => ({}) },
+    pacman: { type: pacmanSchema,     default: () => ({}) }, // ✅ Added Pac-Man
   },
   updatedAt: { type: Date, default: Date.now },
 }, {
