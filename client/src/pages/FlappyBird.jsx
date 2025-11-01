@@ -1,175 +1,201 @@
-import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+// App.js
+import React, { useState, useEffect } from "react";
 
-// A cleaner, more polished Flappy Bird implementation
-export default function FlappyBird() {
-  const canvasRef = useRef(null);
+export default function App() {
+  const [birdY, setBirdY] = useState(200);
+  const [birdVel, setBirdVel] = useState(0);
+  const [pipes, setPipes] = useState([]);
+  const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
-  const [isGameOver, setIsGameOver] = useState(false);
-  const [isStarted, setIsStarted] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
 
-  const bird = useRef({ x: 180, y: 250, radius: 20, velocity: 0, gravity: 0.45, lift: -7.5 });
-  const pipes = useRef([]);
-  const groundOffset = useRef(0);
-  const raf = useRef(null);
+  const gravity = 0.5;
+  const jumpStrength = -8;
 
-  const resetGame = () => {
-    bird.current.y = 250;
-    bird.current.velocity = 0;
-    pipes.current = [];
-    groundOffset.current = 0;
-    setScore(0);
-    setIsGameOver(false);
-    setIsStarted(false);
-  };
-
-  const flap = () => {
-    if (isGameOver) return;
-    if (!isStarted) setIsStarted(true);
-    bird.current.velocity = bird.current.lift;
-  };
-
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.code === "Space" || e.code === "ArrowUp") flap();
-      if (e.code === "Enter" && isGameOver) resetGame();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isGameOver, isStarted]);
-
-  const update = (ctx, canvas) => {
-    const b = bird.current;
-
-    // Draw background
-    const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    sky.addColorStop(0, "#75c9ff");
-    sky.addColorStop(1, "#1c7ed6");
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    if (isStarted && !isGameOver) {
-      b.velocity += b.gravity;
-      b.y += b.velocity;
-
-      const pipeGap = 170;
-      const pipeWidth = 90;
-      const spacing = 320;
-
-      if (!pipes.current.length || pipes.current[pipes.current.length - 1].x < canvas.width - spacing) {
-        const topHeight = Math.random() * (canvas.height * 0.45);
-        pipes.current.push({ x: canvas.width, top: topHeight, bottom: topHeight + pipeGap, width: pipeWidth, scored: false });
-      }
-
-      pipes.current.forEach((p) => {
-        p.x -= 3.2;
-
-        const pipeGrad = ctx.createLinearGradient(p.x, 0, p.x + p.width, 0);
-        pipeGrad.addColorStop(0, "#2ecc71");
-        pipeGrad.addColorStop(1, "#27ae60");
-        ctx.fillStyle = pipeGrad;
-
-        ctx.fillRect(p.x, 0, p.width, p.top);
-        ctx.fillRect(p.x, p.bottom, p.width, canvas.height - p.bottom);
-
-        // collision
-        if (
-          b.x + b.radius > p.x &&
-          b.x - b.radius < p.x + p.width &&
-          (b.y - b.radius < p.top || b.y + b.radius > p.bottom)
-        ) {
-          setIsGameOver(true);
-          return;
-        }
-
-        // scoring
-        if (!p.scored && p.x + p.width < b.x - b.radius) {
-          setScore((s) => s + 1);
-          p.scored = true;
-        }
-      });
-
-      pipes.current = pipes.current.filter((p) => p.x + p.width > 0);
-
-      groundOffset.current = (groundOffset.current - 3.2) % 40;
-    }
-
-    // Ground
-    const groundH = 80;
-    ctx.fillStyle = "#c8b68a";
-    ctx.fillRect(0, canvas.height - groundH, canvas.width, groundH);
-    ctx.fillStyle = "#aa9978";
-    for (let x = groundOffset.current; x < canvas.width; x += 40) {
-      ctx.fillRect(x, canvas.height - groundH, 20, 12);
-    }
-
-    // Bird
-    ctx.save();
-    ctx.translate(b.x, b.y);
-    ctx.fillStyle = "#ffdf3e";
-    ctx.beginPath();
-    ctx.arc(0, 0, b.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    if (b.y + b.radius >= canvas.height - groundH || b.y - b.radius <= 0) {
-      setIsGameOver(true);
+  const jump = () => {
+    if (gameOver) {
+      resetGame();
       return;
     }
+    if (!gameStarted) setGameStarted(true);
+    setBirdVel(jumpStrength);
+  };
 
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 32px Arial";
-    ctx.fillText(`Score: ${score}`, 20, 50);
-
-    if (!isGameOver) raf.current = requestAnimationFrame(() => update(ctx, canvas));
-
-    if (!isStarted) {
-      ctx.fillStyle = "rgba(0,0,0,0.55)";
-      ctx.font = "28px Arial";
-      ctx.fillText("Tap or Press Space to Start", canvas.width / 2 - 200, canvas.height / 2);
-    }
-
-    if (isGameOver) {
-      ctx.fillStyle = "rgba(0,0,0,0.5)";
-      ctx.font = "38px Arial";
-      ctx.fillText("GAME OVER", canvas.width / 2 - 120, canvas.height / 2 - 20);
-      ctx.font = "22px Arial";
-      ctx.fillText("Press Enter to Restart", canvas.width / 2 - 130, canvas.height / 2 + 20);
-    }
+  const resetGame = () => {
+    setBirdY(200);
+    setBirdVel(0);
+    setPipes([]);
+    setScore(0);
+    setGameOver(false);
+    setGameStarted(false);
   };
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+    const handleKey = (e) => {
+      if (e.code === "Space" || e.code === "ArrowUp") {
+        e.preventDefault();
+        jump();
+      }
     };
-    resize();
-    window.addEventListener("resize", resize);
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  });
 
-    cancelAnimationFrame(raf.current);
-    raf.current = requestAnimationFrame(() => update(ctx, canvas));
+  useEffect(() => {
+    if (!gameStarted || gameOver) return;
 
-    return () => {
-      cancelAnimationFrame(raf.current);
-      window.removeEventListener("resize", resize);
-    };
-  }, [isGameOver, isStarted, score]);
+    const gameLoop = setInterval(() => {
+      // bird physics
+      setBirdVel((v) => v + gravity);
+      setBirdY((y) => y + birdVel);
+
+      // move pipes
+      setPipes((prev) =>
+        prev
+          .map((pipe) => ({ ...pipe, x: pipe.x - 3 }))
+          .filter((pipe) => pipe.x + 100 > 0)
+      );
+
+      // generate pipes
+      if (pipes.length === 0 || pipes[pipes.length - 1].x < 250) {
+        const topY = Math.floor(Math.random() * 200) - 150;
+        setPipes((prev) => [...prev, { x: 600, y: topY }]);
+      }
+
+      // check collisions
+      const birdRect = { top: birdY, bottom: birdY + 50, left: 50, right: 100 };
+      for (let pipe of pipes) {
+        const pipeRect = { top: pipe.y, bottom: pipe.y + 600, left: pipe.x, right: pipe.x + 100 };
+        const overlap =
+          birdRect.right > pipeRect.left &&
+          birdRect.left < pipeRect.right &&
+          birdRect.bottom > pipeRect.top &&
+          birdRect.top < pipeRect.bottom;
+        if (overlap || birdY > 550 || birdY < 0) {
+          setGameOver(true);
+          setGameStarted(false);
+          clearInterval(gameLoop);
+          return;
+        }
+      }
+
+      // scoring
+      pipes.forEach((pipe) => {
+        if (pipe.x + 100 === 50) setScore((s) => s + 1);
+      });
+    }, 30);
+
+    return () => clearInterval(gameLoop);
+  }, [gameStarted, gameOver, birdVel, pipes]);
 
   return (
-    <div className="flex items-center justify-center w-full h-screen bg-gradient-to-b from-sky-300 to-sky-600 select-none">
-      <canvas ref={canvasRef} onClick={flap} className="w-full h-full" />
+    <div
+      onClick={jump}
+      style={{
+        position: "relative",
+        width: "600px",
+        height: "600px",
+        border: "1px solid #000",
+        overflow: "hidden",
+        backgroundColor: gameOver ? "#ff6347" : "#87ceeb",
+        margin: "0 auto",
+        transition: "background-color 0.5s ease",
+        cursor: "pointer",
+      }}
+    >
+      {/* Bird */}
+      <img
+        src="https://media.geeksforgeeks.org/wp-content/uploads/20231211115925/flappy_bird_by_jubaaj_d93bpnj.gif"
+        alt="bird"
+        style={{
+          position: "absolute",
+          width: "50px",
+          height: "50px",
+          left: 50,
+          top: birdY,
+          userSelect: "none",
+        }}
+        draggable={false}
+      />
 
-      {!isStarted && !isGameOver && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="absolute text-2xl font-bold bg-white/40 p-4 rounded-xl backdrop-blur-md shadow-xl"
+      {/* Pipes */}
+      {pipes.map((pipe, i) => (
+        <img
+          key={i}
+          src="https://media.geeksforgeeks.org/wp-content/uploads/20231211115753/6d2a698f31595a1.png"
+          alt="pipe"
+          style={{
+            position: "absolute",
+            width: "100px",
+            height: "600px",
+            left: pipe.x,
+            top: pipe.y,
+            userSelect: "none",
+          }}
+          draggable={false}
+        />
+      ))}
+
+      {/* UI */}
+      {gameStarted && !gameOver && (
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            left: 10,
+            fontSize: 24,
+            fontWeight: "bold",
+            color: "#fff",
+            textShadow: "1px 1px 2px black",
+          }}
         >
-          Click or press Space to begin
-        </motion.div>
+          Score: {score}
+        </div>
+      )}
+
+      {!gameStarted && !gameOver && (
+        <div
+          style={{
+            position: "absolute",
+            top: "45%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            fontSize: 24,
+            fontWeight: "bold",
+            color: "#fff",
+          }}
+        >
+          Click or Press Space to Start
+        </div>
+      )}
+
+      {gameOver && (
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            textAlign: "center",
+            color: "white",
+            fontSize: "24px",
+            fontWeight: "bold",
+          }}
+        >
+          Game Over
+          <br />
+          <p
+            style={{
+              backgroundColor: "blue",
+              padding: "4px 8px",
+              borderRadius: "5px",
+              display: "inline-block",
+              marginTop: "8px",
+            }}
+          >
+            Click or Press Space to Restart
+          </p>
+        </div>
       )}
     </div>
   );

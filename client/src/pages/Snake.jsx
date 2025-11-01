@@ -5,6 +5,7 @@ export default function Snake() {
   const [score, setScore] = useState(0);
   const [starter, setStarter] = useState(() => localStorage.getItem("snake_starter") || "p1");
   const scoreRef = useRef(0);
+  const restartRef = useRef(() => {}); // will hold the reset function
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -63,13 +64,9 @@ export default function Snake() {
       const nextStarter = starter === "p1" ? "p2" : "p1";
       localStorage.setItem("snake_starter", nextStarter);
       setStarter(nextStarter);
-
-      setTimeout(() => {
-        reset(nextStarter);
-      }, 600);
     }
 
-    function reset(nextStarter) {
+    function reset(nextStarter = starter) {
       snake = [{ x: 5, y: 5 }];
       dir = nextStarter === "p1" ? { x: 1, y: 0 } : { x: 0, y: 1 };
       nextDir = { ...dir };
@@ -81,6 +78,7 @@ export default function Snake() {
       scoreRef.current = 0;
       requestAnimationFrame(loop);
     }
+    restartRef.current = reset;
 
     function tick() {
       dir = nextDir;
@@ -161,7 +159,7 @@ export default function Snake() {
       canvas.removeEventListener("touchstart", handleTouchStart);
       canvas.removeEventListener("touchend", handleTouchEnd);
     };
-  }, []); // run once, not on starter change
+  }, [starter]);
 
   return (
     <div style={{ padding: 16, textAlign: "center" }}>
@@ -180,6 +178,22 @@ export default function Snake() {
           background: "#0b1220",
         }}
       />
+      <div style={{ marginTop: 12 }}>
+        <button
+          onClick={() => restartRef.current()}
+          style={{
+            background: "#1e293b",
+            color: "#f1f5f9",
+            border: "none",
+            padding: "10px 16px",
+            borderRadius: 8,
+            cursor: "pointer",
+            fontSize: 16,
+          }}
+        >
+          Restart
+        </button>
+      </div>
     </div>
   );
 }
