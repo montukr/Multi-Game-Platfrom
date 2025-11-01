@@ -5,24 +5,30 @@ export default function Snake() {
   const [score, setScore] = useState(0);
   const [starter, setStarter] = useState(() => localStorage.getItem("snake_starter") || "p1");
   const scoreRef = useRef(0);
+  const restartRef = useRef(() => {}); // will hold the reset function
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-    const size = 20, cols = Math.floor(canvas.width / size), rows = Math.floor(canvas.height / size);
+    const size = 20,
+      cols = Math.floor(canvas.width / size),
+      rows = Math.floor(canvas.height / size);
 
     let snake = [{ x: 5, y: 5 }];
-    // Starter gets initial direction advantage
     let dir = starter === "p1" ? { x: 1, y: 0 } : { x: 0, y: 1 };
     let nextDir = { ...dir };
     let food = randFood();
-    let last = 0, stepMs = 110, acc = 0, running = true;
+    let last = 0,
+      stepMs = 110,
+      acc = 0,
+      running = true;
     let best = 0;
 
     function randFood() {
       let f;
-      do { f = { x: Math.floor(Math.random() * cols), y: Math.floor(Math.random() * rows) }; }
-      while (snake.some(s => s.x === f.x && s.y === f.y));
+      do {
+        f = { x: Math.floor(Math.random() * cols), y: Math.floor(Math.random() * rows) };
+      } while (snake.some((s) => s.x === f.x && s.y === f.y));
       return f;
     }
 
@@ -53,37 +59,43 @@ export default function Snake() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ score: best }),
-      }).catch(()=>{});
+      }).catch(() => {});
 
-      // Toggle starter for next match
       const nextStarter = starter === "p1" ? "p2" : "p1";
       localStorage.setItem("snake_starter", nextStarter);
       setStarter(nextStarter);
-
-      // Auto-restart after brief delay to simulate “result screen”, or let user refresh/play again
-      setTimeout(() => {
-        // simple reset using same component life
-        reset(nextStarter);
-      }, 600);
     }
 
-    function reset(nextStarter) {
+    function reset(nextStarter = starter) {
       snake = [{ x: 5, y: 5 }];
       dir = nextStarter === "p1" ? { x: 1, y: 0 } : { x: 0, y: 1 };
       nextDir = { ...dir };
       food = randFood();
-      last = 0; acc = 0; running = true;
-      setScore(0); scoreRef.current = 0;
+      last = 0;
+      acc = 0;
+      running = true;
+      setScore(0);
+      scoreRef.current = 0;
       requestAnimationFrame(loop);
     }
+    restartRef.current = reset;
 
     function tick() {
       dir = nextDir;
-      const head = { x: (snake[0].x + dir.x + cols) % cols, y: (snake[0].y + dir.y + rows) % rows };
-      if (snake.some((s, i) => i !== 0 && s.x === head.x && s.y === head.y)) { gameOver(); return; }
+      const head = {
+        x: (snake[0].x + dir.x + cols) % cols,
+        y: (snake[0].y + dir.y + rows) % rows,
+      };
+      if (snake.some((s, i) => i !== 0 && s.x === head.x && s.y === head.y)) {
+        gameOver();
+        return;
+      }
       snake.unshift(head);
       if (head.x === food.x && head.y === food.y) {
-        setScore((s) => { scoreRef.current = s + 1; return s + 1; });
+        setScore((s) => {
+          scoreRef.current = s + 1;
+          return s + 1;
+        });
         food = randFood();
       } else {
         snake.pop();
@@ -92,54 +104,96 @@ export default function Snake() {
 
     function loop(ts) {
       if (!running) return;
-      const dt = ts - last; last = ts; acc += dt;
-      while (acc >= stepMs) { tick(); acc -= stepMs; }
-      draw(); requestAnimationFrame(loop);
+      const dt = ts - last;
+      last = ts;
+      acc += dt;
+      while (acc >= stepMs) {
+        tick();
+        acc -= stepMs;
+      }
+      draw();
+      requestAnimationFrame(loop);
     }
-
-    const mm = (e) => { const p = toCanvasCoords(canvas, e); setToward(p.x, p.y); };
-    const tm = (e) => { const p = toCanvasCoords(canvas, e); setToward(p.x, p.y); e.preventDefault(); };
-    canvas.addEventListener("mousemove", mm);
-    canvas.addEventListener("touchmove", tm, { passive: false });
-    window.addEventListener("keydown", keyDown);
-
-    requestAnimationFrame(loop);
-    return () => {
-      canvas.removeEventListener("mousemove", mm);
-      canvas.removeEventListener("touchmove", tm);
-      window.removeEventListener("keydown", keyDown);
-    };
 
     function keyDown(e) {
-      if (e.key === "ArrowUp" && dir.y !== 1) nextDir = { x: 0, y: -1 };
-      else if (e.key === "ArrowDown" && dir.y !== -1) nextDir = { x: 0, y: 1 };
-      else if (e.key === "ArrowLeft" && dir.x !== 1) nextDir = { x: -1, y: 0 };
-      else if (e.key === "ArrowRight" && dir.x !== -1) nextDir = { x: 1, y: 0 };
+      const key = e.key.toLowerCase();
+      if ((key === "arrowup" || key === "w") && dir.y !== 1)
+        nextDir = { x: 0, y: -1 };
+      else if ((key === "arrowdown" || key === "s") && dir.y !== -1)
+        nextDir = { x: 0, y: 1 };
+      else if ((key === "arrowleft" || key === "a") && dir.x !== 1)
+        nextDir = { x: -1, y: 0 };
+      else if ((key === "arrowright" || key === "d") && dir.x !== -1)
+        nextDir = { x: 1, y: 0 };
     }
-    function toCanvasCoords(canvas, e) {
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX !== undefined ? e.clientX : e.touches[0].clientX;
-      const y = e.clientY !== undefined ? e.clientY : e.touches[0].clientY;
-      return { x: x - rect.left, y: y - rect.top };
-    }
-    function setToward(x, y) {
-      const head = { x: snake[0].x * size + size / 2, y: snake[0].y * size + size / 2 };
-      const dx = x - head.x, dy = y - head.y;
+
+    // swipe controls
+    let startX = 0,
+      startY = 0;
+    const handleTouchStart = (e) => {
+      const t = e.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+    };
+    const handleTouchEnd = (e) => {
+      const t = e.changedTouches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
       if (Math.abs(dx) > Math.abs(dy)) {
-        if (dx > 0 && dir.x !== -1) nextDir = { x: 1, y: 0 };
-        if (dx < 0 && dir.x !== 1) nextDir = { x: -1, y: 0 };
+        if (dx > 30 && dir.x !== -1) nextDir = { x: 1, y: 0 };
+        if (dx < -30 && dir.x !== 1) nextDir = { x: -1, y: 0 };
       } else {
-        if (dy > 0 && dir.y !== -1) nextDir = { x: 0, y: 1 };
-        if (dy < 0 && dir.y !== 1) nextDir = { x: 0, y: -1 };
+        if (dy > 30 && dir.y !== -1) nextDir = { x: 0, y: 1 };
+        if (dy < -30 && dir.y !== 1) nextDir = { x: 0, y: -1 };
       }
-    }
+    };
+
+    window.addEventListener("keydown", keyDown);
+    canvas.addEventListener("touchstart", handleTouchStart, { passive: true });
+    canvas.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    requestAnimationFrame(loop);
+
+    return () => {
+      window.removeEventListener("keydown", keyDown);
+      canvas.removeEventListener("touchstart", handleTouchStart);
+      canvas.removeEventListener("touchend", handleTouchEnd);
+    };
   }, [starter]);
 
   return (
-    <div style={{ padding: 16 }}>
+    <div style={{ padding: 16, textAlign: "center" }}>
       <h2>Snake</h2>
-      <p>Score: {score} • Starter: {starter === "p1" ? "Player A" : "Player B"}</p>
-      <canvas ref={canvasRef} width={480} height={360} style={{ border: "1px solid #e5e7eb", borderRadius: 10, touchAction: "none", background: "#0b1220" }} />
+      <p>
+        Score: {score} • Starter: {starter === "p1" ? "Player A" : "Player B"}
+      </p>
+      <canvas
+        ref={canvasRef}
+        width={480}
+        height={360}
+        style={{
+          border: "1px solid #e5e7eb",
+          borderRadius: 10,
+          touchAction: "none",
+          background: "#0b1220",
+        }}
+      />
+      <div style={{ marginTop: 12 }}>
+        <button
+          onClick={() => restartRef.current()}
+          style={{
+            background: "#1e293b",
+            color: "#f1f5f9",
+            border: "none",
+            padding: "10px 16px",
+            borderRadius: 8,
+            cursor: "pointer",
+            fontSize: 16,
+          }}
+        >
+          Restart
+        </button>
+      </div>
     </div>
   );
 }
