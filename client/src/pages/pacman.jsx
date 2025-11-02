@@ -39,7 +39,6 @@
 
 //   const [engineReady, setEngineReady] = useState(false);
 
-//   // Initialize engine + layout once
 //   useEffect(() => {
 //     const eng = createPacmanEngine({
 //       rows: DEFAULT_ROWS,
@@ -65,7 +64,6 @@
 //     };
 //   }, [levelLayout]);
 
-//   // FIXED: Tick loop - only depends on engineReady, NOT state.tickMs
 //   useEffect(() => {
 //     if (!engineReady || !engineRef.current) return;
 
@@ -83,7 +81,6 @@
 //       }
 //     };
 
-//     // Start interval using the engine's tickMs (140ms)
 //     intervalRef.current = setInterval(runTick, 140);
 
 //     return () => {
@@ -92,9 +89,8 @@
 //         intervalRef.current = null;
 //       }
 //     };
-//   }, [engineReady]); // FIXED: Removed state.tickMs dependency
+//   }, [engineReady]);
 
-//   // Keyboard controls
 //   useEffect(() => {
 //     const handleKey = (e) => {
 //       const key = (e.key || "").toLowerCase();
@@ -109,7 +105,7 @@
 
 //   async function saveScore(finalScore) {
 //     try {
-//       await api.post("/api/scores/pacman", { score: finalScore });
+//       await api.post("/api/scores/pacman/best", { score: finalScore });
 //     } catch (err) {
 //       console.warn("Failed to save Pac-Man score", err);
 //     }
@@ -338,7 +334,9 @@
 //     candidates.sort((a, b) =>
 //       g.vulnerable ? b.dist - a.dist : a.dist - b.dist
 //     );
-//     const pick = candidates[Math.random() < 0.8 ? 0 : Math.min(1, candidates.length - 1)] || candidates[0];
+//     const pick =
+//       candidates[Math.random() < 0.8 ? 0 : Math.min(1, candidates.length - 1)] ||
+//       candidates[0];
 //     return { ...g, dir: pick.d, r: pick.r, c: pick.c };
 //   };
 
@@ -357,10 +355,10 @@
 //     const tile = level[pac.r][pac.c];
 //     if (tile === 0) {
 //       level[pac.r][pac.c] = 9;
-//       score += DOT_SCORE;
+//       score += 10;
 //     } else if (tile === 2) {
 //       level[pac.r][pac.c] = 9;
-//       score += PELLET_SCORE;
+//       score += 50;
 //       frighten();
 //     }
 
@@ -388,7 +386,7 @@
 //       if (g.r === pac.r && g.c === pac.c) {
 //         if (g.vulnerable) {
 //           ghostComboMultiplier++;
-//           score += GHOST_BASE_SCORE * ghostComboMultiplier;
+//           score += 200 * ghostComboMultiplier;
 //           g.respawnTicks = respawnTickCount;
 //           g.vulnerable = false;
 //         } else {
@@ -622,8 +620,6 @@ export default function PacmanSingle({ levelLayout }) {
   useEffect(() => {
     if (!engineReady || !engineRef.current) return;
 
-    const eng = engineRef.current;
-
     const runTick = () => {
       if (!engineRef.current) return;
       engineRef.current.update();
@@ -803,6 +799,7 @@ function createPacmanEngine(opts = {}) {
   let pac = { r: 7, c: 9, dir: "left", nextDir: null };
   let ghosts = [];
   let frightenedTicks = 0;
+  let spawnShieldTicks = 0; // grace after init/restart to prevent instant deaths
   const respawnTickCount = Math.max(1, Math.round(RESPAWN_MS / TICK_MS));
   const frightenedTickCountDefault = Math.max(1, Math.round(FRIGHTEN_MS / TICK_MS));
   let ghostComboMultiplier = 0;
@@ -815,6 +812,9 @@ function createPacmanEngine(opts = {}) {
   ];
 
   const cloneLevel = (l) => l.map((r) => [...r]);
+  const inBounds = (r, c) => r >= 0 && r < ROWS && c >= 0 && c < COLS;
+  const walkable = (r, c) => inBounds(r, c) && level[r][c] !== 1;
+
   const ensurePellets = (l) => {
     const corners = [
       { r: 1, c: 1 },
@@ -825,28 +825,56 @@ function createPacmanEngine(opts = {}) {
     corners.forEach(({ r, c }) => l[r] && l[r][c] === 0 && (l[r][c] = 2));
   };
 
+  function placeOnFree(preferred, occupied = []) {
+    const isFree = (r, c) => walkable(r, c) && !occupied.some(o => o.r === r && o.c === c);
+    if (preferred && isFree(preferred.r, preferred.c)) return { r: preferred.r, c: preferred.c };
+    const neighbors = preferred ? [
+      { r: preferred.r, c: preferred.c - 1 },
+      { r: preferred.r, c: preferred.c + 1 },
+      { r: preferred.r - 1, c: preferred.c },
+      { r: preferred.r + 1, c: preferred.c },
+    ] : [];
+    for (const nb of neighbors) {
+      if (nb && isFree(nb.r, nb.c)) return { r: nb.r, c: nb.c };
+    }
+    for (let r = 1; r < ROWS - 1; r++) {
+      for (let c = 1; c < COLS - 1; c++) {
+        if (isFree(r, c)) return { r, c };
+      }
+    }
+    return { r: 1, c: 1 };
+  }
+
   function init(initLevel) {
     level = cloneLevel(initLevel);
     ensurePellets(level);
     score = 0;
     gameOver = false;
-    pac = { r: Math.floor(ROWS / 2), c: Math.floor(COLS / 2), dir: "left", nextDir: null };
-    ghosts = GHOST_STARTS.map((p, i) => ({
-      id: i,
-      r: p.r,
-      c: p.c,
-      dir: i % 2 ? "left" : "right",
-      colorIndex: i,
-      vulnerable: false,
-      respawnTicks: 0,
-      home: { r: p.r, c: p.c },
-    }));
     frightenedTicks = 0;
     ghostComboMultiplier = 0;
-  }
 
-  const inBounds = (r, c) => r >= 0 && r < ROWS && c >= 0 && c < COLS;
-  const walkable = (r, c) => inBounds(r, c) && level[r][c] !== 1;
+    const center = { r: Math.floor(ROWS / 2), c: Math.floor(COLS / 2) };
+    const pacPos = placeOnFree(center, []);
+    pac = { r: pacPos.r, c: pacPos.c, dir: "left", nextDir: null };
+
+    const placed = [{ r: pac.r, c: pac.c }];
+    ghosts = GHOST_STARTS.map((p, i) => {
+      const pos = placeOnFree(p, placed);
+      placed.push(pos);
+      return {
+        id: i,
+        r: pos.r,
+        c: pos.c,
+        dir: i % 2 ? "left" : "right",
+        colorIndex: i,
+        vulnerable: false,
+        respawnTicks: 0,
+        home: { r: pos.r, c: pos.c },
+      };
+    });
+
+    spawnShieldTicks = 4; // longer grace to avoid first-tick overlaps on slower devices
+  }
 
   const tryChangeDir = (e) => {
     if (!e.nextDir) return e;
@@ -886,9 +914,7 @@ function createPacmanEngine(opts = {}) {
       .filter(Boolean);
     if (!candidates.length) return g;
 
-    candidates.sort((a, b) =>
-      g.vulnerable ? b.dist - a.dist : a.dist - b.dist
-    );
+    candidates.sort((a, b) => (g.vulnerable ? b.dist - a.dist : a.dist - b.dist));
     const pick =
       candidates[Math.random() < 0.8 ? 0 : Math.min(1, candidates.length - 1)] ||
       candidates[0];
@@ -904,24 +930,28 @@ function createPacmanEngine(opts = {}) {
   function update() {
     if (gameOver) return;
 
+    // 1) Pac movement
     pac = tryChangeDir(pac);
     pac = move(pac);
 
+    // 2) Consume tile
     const tile = level[pac.r][pac.c];
     if (tile === 0) {
       level[pac.r][pac.c] = 9;
-      score += 10;
+      score += DOT_SCORE;
     } else if (tile === 2) {
       level[pac.r][pac.c] = 9;
-      score += 50;
+      score += PELLET_SCORE;
       frighten();
     }
 
+    // 3) Frightened countdown
     if (frightenedTicks > 0) {
       frightenedTicks--;
       if (frightenedTicks === 0) ghosts.forEach((g) => (g.vulnerable = false));
     }
 
+    // 4) Ghost movement
     ghosts = ghosts.map((g) => {
       if (g.respawnTicks > 0) {
         g.respawnTicks--;
@@ -936,20 +966,47 @@ function createPacmanEngine(opts = {}) {
       return moved;
     });
 
-    for (const g of ghosts) {
-      if (g.respawnTicks > 0) continue;
-      if (g.r === pac.r && g.c === pac.c) {
-        if (g.vulnerable) {
-          ghostComboMultiplier++;
-          score += 200 * ghostComboMultiplier;
-          g.respawnTicks = respawnTickCount;
-          g.vulnerable = false;
-        } else {
-          gameOver = true;
+    // 5) Grace period handling: prevent collision by nudging ghosts away
+    if (spawnShieldTicks > 0) {
+      for (const g of ghosts) {
+        if (g.respawnTicks > 0) continue;
+        if (g.r === pac.r && g.c === pac.c) {
+          const dirs = ["up", "down", "left", "right"];
+          const candidates = dirs.map((d) => {
+            let r = g.r, c = g.c;
+            if (d === "up") r--;
+            if (d === "down") r++;
+            if (d === "left") c--;
+            if (d === "right") c++;
+            return walkable(r, c) ? { r, c, d } : null;
+          }).filter(Boolean);
+          const pick = candidates[0];
+          if (pick) {
+            g.r = pick.r;
+            g.c = pick.c;
+            g.dir = pick.d;
+          }
+        }
+      }
+      spawnShieldTicks--;
+    } else {
+      // 6) Normal collision resolution
+      for (const g of ghosts) {
+        if (g.respawnTicks > 0) continue;
+        if (g.r === pac.r && g.c === pac.c) {
+          if (g.vulnerable) {
+            ghostComboMultiplier++;
+            score += GHOST_BASE_SCORE * ghostComboMultiplier;
+            g.respawnTicks = respawnTickCount;
+            g.vulnerable = false;
+          } else {
+            gameOver = true;
+          }
         }
       }
     }
 
+    // 7) Win condition
     const hasDots = level.some((r) => r.some((c) => c === 0 || c === 2));
     if (!hasDots) gameOver = true;
   }
@@ -983,18 +1040,21 @@ function createPacmanEngine(opts = {}) {
 function createDefaultLevel(rows, cols) {
   const grid = Array.from({ length: rows }, (_, r) =>
     Array.from({ length: cols }, (_, c) => {
-      if (r === 0 || c === 0 || r === rows - 1 || c === cols - 1) return 1;
-      return 0;
+      if (r === 0 || c === 0 || r === rows - 1 || c === cols - 1) return 1; // border walls
+      return 0; // dot
     })
   );
+  // inner walls
   for (let r = 2; r < rows - 2; r += 2)
     for (let c = 2; c < cols - 2; c += 3) grid[r][c] = 1;
 
+  // center "house" cleared to empty (9)
   const midR = Math.floor(rows / 2);
   const midC = Math.floor(cols / 2);
   for (let dr = -1; dr <= 1; dr++)
     for (let dc = -2; dc <= 2; dc++) grid[midR + dr][midC + dc] = 9;
 
+  // power pellets in corners
   const corners = [
     { r: 1, c: 1 },
     { r: 1, c: cols - 2 },
